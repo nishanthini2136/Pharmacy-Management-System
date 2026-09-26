@@ -4,6 +4,48 @@ from tkinter import ttk
 import mysql.connector
 from tkinter import messagebox
 
+
+def get_db_connection():
+    for db_name in ["pharmacy_management", "sys"]:
+        for pwd in ["root", "Nisha2136*", "Rithanya&2005", ""]:
+            try:
+                return mysql.connector.connect(host="localhost", username="root", password=pwd, database=db_name)
+            except mysql.connector.Error:
+                continue
+    return mysql.connector.connect(host="localhost", username="root", password="root", database="pharmacy_management")
+
+def init_db():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS pharma (
+                Ref VARCHAR(100) PRIMARY KEY,
+                MedName VARCHAR(100)
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS pharmacy (
+                refno VARCHAR(100) PRIMARY KEY,
+                cmpName VARCHAR(100),
+                Type VARCHAR(100),
+                medname VARCHAR(100),
+                lot VARCHAR(100),
+                issuedate VARCHAR(100),
+                expdate VARCHAR(100),
+                uses VARCHAR(255),
+                sideeffect VARCHAR(255),
+                warning VARCHAR(255),
+                dosage VARCHAR(100),
+                price VARCHAR(100),
+                product VARCHAR(100)
+            )
+        """)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print("Database initialization note:", e)
+
 class PharmacyManagementSystem:
     def __init__(self,root):
         self.root=root
@@ -68,7 +110,7 @@ class PharmacyManagementSystem:
         btnRestMed=Button(ButtonFrame,command=self.reset,text="RESET",font=("arial",13,"bold"),width=14,bg="darkgreen",fg="white")
         btnRestMed.grid(row=0,column=3)
         
-        btnExitMEd=Button(ButtonFrame,text="EXIT",font=("arial",13,"bold"),width=14,bg="darkgreen",fg="white")
+        btnExitMEd=Button(ButtonFrame,command=self.root.destroy,text="EXIT",font=("arial",13,"bold"),width=14,bg="darkgreen",fg="white")
         btnExitMEd.grid(row=0,column=4)
 
         #=========================Search bY===============================
@@ -98,7 +140,7 @@ class PharmacyManagementSystem:
         FrameDetails.place(x=0,y=590,width=1530,height=210)
 
         try:
-            conn=mysql.connector.connect(host="localhost",username="root",password="Rithanya&2005",database="sys")
+            conn=get_db_connection()
             my_cursor=conn.cursor()
             my_cursor.execute("select Ref from pharma")
             r=my_cursor.fetchall()
@@ -114,7 +156,8 @@ class PharmacyManagementSystem:
         lblrefno.grid(row=0,column=0,sticky=W)
 
         comrefno=ttk.Combobox(DataFrameLeft,textvariable=self.ref_var,state="readonly",font=("arial",12,"bold"),width=27)
-        comrefno['value']=r
+        self.comrefno = comrefno
+        comrefno['value']=[row[0] for row in r]
         if r:
             comrefno.current(0)
         comrefno.grid(row=0,column=1)
@@ -134,7 +177,7 @@ class PharmacyManagementSystem:
 
         #======================================Add Medicine=====================
         try:
-            conn=mysql.connector.connect(host="localhost",username="root",password="Rithanya&2005",database="sys")
+            conn=get_db_connection()
             my_cursor=conn.cursor()
             my_cursor.execute("select MedName from pharma")
             ide=my_cursor.fetchall()
@@ -150,7 +193,8 @@ class PharmacyManagementSystem:
         lblMedicineName.grid(row=3,column=0,sticky=W)
                                              
         comMedicineName=ttk.Combobox(DataFrameLeft,textvariable=self.medName_var,state="readonly",font=("arial",12,"bold"),width=27)
-        comMedicineName['value']=ide
+        self.comMedicineName = comMedicineName
+        comMedicineName['value']=[row[0] for row in ide]
         if ide:
             comMedicineName.current(0)
         comMedicineName.grid(row=3,column=1)
@@ -351,9 +395,21 @@ class PharmacyManagementSystem:
 
         #=======================Add Medicine Functionality Declaration============================
 
+
+    def refresh_combos(self):
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("select Ref from pharma")
+            self.comrefno['value'] = [row[0] for row in cur.fetchall()]
+            cur.execute("select MedName from pharma")
+            self.comMedicineName['value'] = [row[0] for row in cur.fetchall()]
+            conn.close()
+        except Exception:
+            pass
     def AddMed(self):
         try:
-            conn=mysql.connector.connect(host="localhost",username="root",password="Rithanya&2005",database="sys")
+            conn=get_db_connection()
             my_cursor=conn.cursor()
             my_cursor.execute("INSERT into pharma(Ref,MedName) VALUES (%s,%s)",(
                                                                                         self.refMed_var.get(),
@@ -362,6 +418,7 @@ class PharmacyManagementSystem:
             conn.commit()
             self.fetch_dataMed()
             self.Medget_cursor()
+            self.refresh_combos()
             conn.close()
             messagebox.showinfo("Success","Medicine Added")
         except mysql.connector.Error as err:
@@ -371,7 +428,7 @@ class PharmacyManagementSystem:
 
     def fetch_dataMed(self):
         try:
-            conn=mysql.connector.connect(host="localhost",username="root",password="Rithanya&2005",database="sys")
+            conn=get_db_connection()
             my_cursor=conn.cursor()
             my_cursor.execute("select * from pharma")
             rows=my_cursor.fetchall()
@@ -404,7 +461,7 @@ class PharmacyManagementSystem:
         if self.refMed_var.get()=="" or self.addmed_var.get()=="":
             messagebox.showerror("Error","All fields are Required")
         else:
-            conn=mysql.connector.connect(host="localhost",username="root",password="Rithanya&2005",database="sys")
+            conn=get_db_connection()
             my_cursor=conn.cursor()
             my_cursor.execute("update pharma set MedName=%s where Ref=%s",(
                                                                             self.addmed_var.get(),
@@ -413,10 +470,11 @@ class PharmacyManagementSystem:
             conn.commit()
             self.fetch_dataMed()
             conn.close()
+            self.refresh_combos()
             messagebox.showinfo("Success","Medicine has been Updated")
 
     def DeleteMed(self):
-        conn=mysql.connector.connect(host="localhost",username="root",password="Rithanya&2005",database="sys")
+        conn=get_db_connection()
         my_cursor=conn.cursor()
 
         sql="delete from pharma where Ref=%s"
@@ -426,6 +484,7 @@ class PharmacyManagementSystem:
         conn.commit()
         self.fetch_dataMed()
         conn.close()
+        self.refresh_combos()
 
     def ClearMed(self):
         self.refMed_var.set("")
@@ -436,7 +495,7 @@ class PharmacyManagementSystem:
         if self.ref_var.get()=="" or self.lot_var.get()=="":
             messagebox.showerror("Error","All fields are required")
         else:
-            conn=mysql.connector.connect(host="localhost",username="root",password="Rithanya&2005",database="sys")
+            conn=get_db_connection()
             my_cursor=conn.cursor()
             my_cursor.execute("INSERT into pharmacy VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",(
                                                                                                 self.ref_var.get(),
@@ -461,7 +520,7 @@ class PharmacyManagementSystem:
 
     def fetch_data(self):
         try:
-            conn=mysql.connector.connect(host="localhost",username="root",password="Rithanya&2005",database="sys")
+            conn=get_db_connection()
             my_cursor=conn.cursor()
             my_cursor.execute("select * from pharmacy")
             row=my_cursor.fetchall()
@@ -478,8 +537,12 @@ class PharmacyManagementSystem:
 
     def get_cursor(self,ev=""):
         cursor_row=self.pharmacy_table.focus()
+        if not cursor_row:
+            return
         content=self.pharmacy_table.item(cursor_row)
-        row=content["values"]
+        row=content.get("values", [])
+        if not row or len(row) < 13:
+            return
 
         self.ref_var.set(row[0]), 
         self.cmpName_var.set(row[1]),
@@ -499,7 +562,7 @@ class PharmacyManagementSystem:
         if self.ref_var.get()=="":
             messagebox.showerror("Error","All fields are Required")
         else:
-            conn=mysql.connector.connect(host="localhost",username="root",password="Rithanya&2005",database="sys")
+            conn=get_db_connection()
             my_cursor=conn.cursor()
             my_cursor.execute("update pharmacy set cmpName=%s,Type=%s,medname=%s,lot=%s,issuedate=%s,expdate=%s,uses=%s,sideeffect=%s,warning=%s,dosage=%s,price=%s,product=%s where refno=%s",(
                                                                                                                                                                                                     self.cmpName_var.get(),
@@ -522,7 +585,7 @@ class PharmacyManagementSystem:
             messagebox.showinfo("UPDATE","Record has been Updated Successfully")
 
     def delete(self):
-        conn=mysql.connector.connect(host="localhost",username="root",password="Rithanya&2005",database="sys")
+        conn=get_db_connection()
         my_cursor=conn.cursor()
 
         sql="delete from pharmacy where refno=%s"
@@ -555,12 +618,7 @@ class PharmacyManagementSystem:
             return
 
         try:
-            conn = mysql.connector.connect(
-                host="localhost",
-                username="root",
-                password="Rithanya&2005",
-                database="sys"
-            )
+            conn = get_db_connection()
             my_cursor = conn.cursor()
 
             # Use a whitelist of allowed column names to prevent SQL injection
